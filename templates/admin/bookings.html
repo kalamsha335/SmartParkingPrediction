@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}All Bookings{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="card-title">
+    📋 All Bookings
+    <a href="/admin/export" class="btn btn-g" style="padding:6px 14px;font-size:.7rem;margin-left:auto">
+      📥 EXPORT EXCEL
+    </a>
+  </div>
+
+  <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:14px">
+    <input class="search-bar" id="search" style="margin-bottom:0;flex:1;min-width:200px"
+           placeholder="Search by name, vehicle, slot, date, booking ID..." oninput="filter()"/>
+    <select id="filter-status" class="fc" style="width:auto" onchange="filter()">
+      <option value="">All Status</option>
+      <option value="confirmed">Confirmed</option>
+      <option value="cancelled">Cancelled</option>
+    </select>
+  </div>
+
+  {% if bookings %}
+  <div id="count" style="font-size:.8rem;color:var(--dim);margin-bottom:10px">
+    Total: {{ bookings|length }} bookings
+  </div>
+  <div class="tbl-wrap">
+    <table id="tbl">
+      <thead>
+        <tr>
+          <th>Booking ID</th><th>User</th><th>Phone</th>
+          <th>Vehicle</th><th>Slot</th><th>Date</th>
+          <th>Time</th><th>Dur.</th><th>Amount</th>
+          <th>Status</th><th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for b in bookings %}
+        <tr class="tbl-row" data-status="{{ b.status }}">
+          <td class="mono text-y" style="font-size:.7rem">{{ b.booking_id }}</td>
+          <td>
+            <div class="fw-bold">{{ b.user_name }}</div>
+            <div class="text-dim" style="font-size:.75rem">{{ b.email }}</div>
+          </td>
+          <td class="text-dim" style="font-size:.82rem">{{ b.phone }}</td>
+          <td class="mono text-n" style="font-size:.8rem">{{ b.vehicle_number }}</td>
+          <td><b>{{ b.slot_id }}</b></td>
+          <td>{{ b.parking_date }}</td>
+          <td style="font-size:.82rem;white-space:nowrap">{{ b.start_time }}–{{ b.end_time }}</td>
+          <td class="text-dim">{{ b.duration }}h</td>
+          <td class="text-g mono fw-bold">₹{{ b.amount }}</td>
+          <td><span class="badge b-{{ b.status }}">{{ b.status.upper() }}</span></td>
+          <td>
+            {% if b.status=='confirmed' %}
+            <form method="POST" action="/admin/cancel/{{ b.booking_id }}"
+                  onsubmit="return confirm('Cancel booking {{ b.booking_id }}?')">
+              <button class="btn btn-r" type="submit"
+                      style="padding:4px 10px;font-size:.63rem">CANCEL</button>
+            </form>
+            {% else %}
+            <span class="text-dim" style="font-size:.78rem">—</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div style="color:var(--dim);text-align:center;padding:40px 0">No bookings found.</div>
+  {% endif %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function filter(){
+  const q=document.getElementById('search').value.toLowerCase();
+  const st=document.getElementById('filter-status').value;
+  let vis=0;
+  document.querySelectorAll('.tbl-row').forEach(r=>{
+    const matchQ=!q||r.textContent.toLowerCase().includes(q);
+    const matchS=!st||r.dataset.status===st;
+    const show=matchQ&&matchS;
+    r.style.display=show?'':'none';
+    if(show)vis++;
+  });
+  document.getElementById('count').textContent=`Showing: ${vis} bookings`;
+}
+</script>
+{% endblock %}

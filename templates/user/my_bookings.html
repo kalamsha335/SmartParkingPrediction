@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}My Bookings{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="card-title">📋 My Booking History</div>
+
+  <input class="search-bar" id="search" placeholder="Search by slot, vehicle, date, booking ID..." oninput="filter()"/>
+
+  {% if bookings %}
+  <div class="tbl-wrap">
+    <table id="tbl">
+      <thead>
+        <tr>
+          <th>Booking ID</th>
+          <th>Vehicle</th>
+          <th>Slot</th>
+          <th>Date</th>
+          <th>Time</th>
+          <th>Duration</th>
+          <th>Amount</th>
+          <th>Status</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for b in bookings %}
+        <tr class="tbl-row">
+          <td class="mono text-y" style="font-size:.72rem">{{ b.booking_id }}</td>
+          <td class="mono text-n" style="font-size:.82rem">{{ b.vehicle_number }}</td>
+          <td><b>{{ b.slot_id }}</b></td>
+          <td>{{ b.parking_date }}</td>
+          <td style="font-size:.84rem">{{ b.start_time }} – {{ b.end_time }}</td>
+          <td>{{ b.duration }}h</td>
+          <td class="text-g mono fw-bold">₹{{ b.amount }}</td>
+          <td><span class="badge b-{{ b.status }}">{{ b.status.upper() }}</span></td>
+          <td>
+            {% if b.status == 'confirmed' %}
+            <form method="POST" action="/cancel/{{ b.booking_id }}"
+                  onsubmit="return confirm('Cancel this booking?')">
+              <button class="btn btn-r" type="submit"
+                      style="padding:5px 12px;font-size:.66rem">CANCEL</button>
+            </form>
+            {% else %}
+            <span class="text-dim" style="font-size:.8rem">—</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div style="color:var(--dim);text-align:center;padding:40px 0;font-size:.95rem">
+    No bookings yet. <a href="/prebook" style="color:var(--neon)">Book your first slot! →</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function filter(){
+  const q=document.getElementById('search').value.toLowerCase();
+  document.querySelectorAll('.tbl-row').forEach(r=>{
+    r.style.display=r.textContent.toLowerCase().includes(q)?'':'none';
+  });
+}
+</script>
+{% endblock %}

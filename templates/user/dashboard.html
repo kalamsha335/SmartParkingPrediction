@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}My Dashboard{% endblock %}
+{% block content %}
+<!-- STATS -->
+<div class="stat-grid">
+  <div class="stat-card sc-b">
+    <div class="stat-label">Total Slots</div>
+    <div class="stat-num" id="s-total">{{ summary.total }}</div>
+  </div>
+  <div class="stat-card sc-g">
+    <div class="stat-label">Available</div>
+    <div class="stat-num" id="s-avail">{{ summary.available }}</div>
+  </div>
+  <div class="stat-card sc-r">
+    <div class="stat-label">Occupied</div>
+    <div class="stat-num" id="s-occ">{{ summary.occupied }}</div>
+  </div>
+  <div class="stat-card sc-y">
+    <div class="stat-label">Reserved</div>
+    <div class="stat-num" id="s-res">{{ summary.booked }}</div>
+  </div>
+</div>
+
+<div class="grid-2">
+  <!-- LIVE SLOT MAP -->
+  <div class="card">
+    <div class="card-title"><span class="live-dot"></span> Live Slot Map</div>
+    <div id="slot-map-user">Loading...</div>
+    <div class="mt-2" style="display:flex;gap:14px;font-size:.78rem;color:var(--dim)">
+      <span style="color:var(--green)">■ Available</span>
+      <span style="color:var(--red)">■ Occupied</span>
+      <span style="color:var(--yellow)">■ Booked</span>
+    </div>
+    <a href="/prebook" class="btn btn-p btn-full mt-2">📌 BOOK A SLOT</a>
+  </div>
+
+  <!-- CNN PREDICTION -->
+  <div class="card">
+    <div class="card-title">🔮 CNN Parking Prediction</div>
+    <div style="text-align:center;padding:12px 0">
+      <div class="mono" style="font-size:2.8rem;font-weight:800;color:var(--yellow);line-height:1" id="pred-num">
+        {{ pred.predicted_occupied }}
+      </div>
+      <div class="text-dim mt-2" style="font-size:.85rem">Expected occupied slots at {{ pred.hour }}:00</div>
+      <div style="margin-top:14px;background:rgba(255,208,0,.08);border:1px solid rgba(255,208,0,.2);
+                  border-radius:8px;padding:12px;font-size:.84rem;color:var(--yellow)" id="pred-note">
+        {% if pred.predicted_occupied > summary.available %}
+          ⚠️ Getting busy — book your slot now!
+        {% elif pred.predicted_occupied < 5 %}
+          ✅ Very low occupancy expected next hour.
+        {% else %}
+          ➡️ Moderate occupancy expected.
+        {% endif %}
+      </div>
+    </div>
+
+    <div style="margin-top:16px">
+      <div style="display:flex;justify-content:space-between;font-size:.82rem;margin-bottom:6px">
+        <span class="text-dim">CNN Model Confidence</span>
+        <span class="text-n mono">{{ pred.confidence }}%</span>
+      </div>
+      <div style="height:8px;background:#0e2235;border-radius:99px;overflow:hidden">
+        <div style="height:100%;width:{{ pred.confidence }}%;background:linear-gradient(90deg,#005f7a,var(--neon));border-radius:99px;transition:width .8s"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- RECENT BOOKINGS -->
+<div class="card mt-3">
+  <div class="card-title">📋 Recent Bookings
+    <a href="/my-bookings" style="font-family:'Rajdhani',sans-serif;font-size:.82rem;color:var(--neon);text-decoration:none;margin-left:auto;font-weight:600">View All →</a>
+  </div>
+  {% if bookings %}
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Booking ID</th><th>Slot</th><th>Date</th><th>Time</th><th>Amount</th><th>Status</th></tr></thead>
+      <tbody>
+        {% for b in bookings %}
+        <tr>
+          <td class="mono text-y" style="font-size:.72rem">{{ b.booking_id }}</td>
+          <td><b>{{ b.slot_id }}</b></td>
+          <td>{{ b.parking_date }}</td>
+          <td style="font-size:.84rem">{{ b.start_time }} – {{ b.end_time }}</td>
+          <td class="text-g mono">₹{{ b.amount }}</td>
+          <td><span class="badge b-{{ b.status }}">{{ b.status.upper() }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div style="color:var(--dim);text-align:center;padding:28px 0">
+    No bookings yet. <a href="/prebook" style="color:var(--neon)">Book your first slot!</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function refreshMap(){
+  const d = await fetch('/api/slots').then(r=>r.json());
+  const floors = {};
+  d.forEach(s=>{ (floors[s.floor]||(floors[s.floor]=[])).push(s); });
+  let html='';
+  for(const [floor,slots] of Object.entries(floors)){
+    html+=`<div class="slot-floor"><div class="floor-label">${floor}</div><div class="slot-row">`;
+    slots.forEach(s=>{
+      const cls = s.status==='available'?'sl-avail':s.status==='occupied'?'sl-occ':'sl-book';
+      html+=`<span class="slot-btn ${cls}" title="${s.status}">${s.slot_id}</span>`;
+    });
+    html+='</div></div>';
+  }
+  document.getElementById('slot-map-user').innerHTML=html;
+}
+async function refreshStats(){
+  const d=await fetch('/api/status').then(r=>r.json());
+  document.getElementById('s-total').textContent=d.total;
+  document.getElementById('s-avail').textContent=d.available;
+  document.getElementById('s-occ').textContent=d.occupied;
+  document.getElementById('s-res').textContent=d.booked;
+  document.getElementById('pred-num').textContent=d.prediction.predicted_occupied;
+}
+refreshMap(); refreshStats();
+setInterval(()=>{refreshMap();refreshStats();},6000);
+</script>
+{% endblock %}

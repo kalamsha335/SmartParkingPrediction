@@ -1,0 +1,27 @@
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environment
+.venv/
+venv/
+ENV/
+env/
+
+# Database files
+*.db
+
+# Archive files
+*.zip
+
+# Dataset files
+smart_parking_cnn/dataset/
+
+# IDE / editor files
+*.swp
+*.swo
+*.idea/
+.vscode/
+*.log

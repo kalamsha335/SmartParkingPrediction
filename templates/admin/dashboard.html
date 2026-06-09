@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% block title %}Admin Dashboard{% endblock %}
+{% block content %}
+<!-- TOP STATS -->
+<div class="stat-grid">
+  <div class="stat-card sc-b">
+    <div class="stat-label">Total Slots</div>
+    <div class="stat-num" id="s-total">{{ summary.total }}</div>
+  </div>
+  <div class="stat-card sc-g">
+    <div class="stat-label">Available</div>
+    <div class="stat-num" id="s-avail">{{ summary.available }}</div>
+  </div>
+  <div class="stat-card sc-r">
+    <div class="stat-label">Occupied</div>
+    <div class="stat-num" id="s-occ">{{ summary.occupied }}</div>
+  </div>
+  <div class="stat-card sc-y">
+    <div class="stat-label">Reserved</div>
+    <div class="stat-num" id="s-res">{{ summary.booked }}</div>
+  </div>
+  <div class="stat-card sc-p">
+    <div class="stat-label">Total Users</div>
+    <div class="stat-num">{{ total_users }}</div>
+  </div>
+  <div class="stat-card sc-g">
+    <div class="stat-label">Active Bookings</div>
+    <div class="stat-num">{{ total_bk }}</div>
+  </div>
+  <div class="stat-card sc-y">
+    <div class="stat-label">Revenue (₹)</div>
+    <div class="stat-num mono" style="font-size:1.4rem">{{ revenue }}</div>
+  </div>
+</div>
+
+<!-- USAGE BAR -->
+<div class="card mb-2">
+  <div class="card-title">📊 Occupancy Overview</div>
+  <div style="display:flex;justify-content:space-between;font-size:.84rem;margin-bottom:8px">
+    <span>Current Usage</span>
+    <span class="text-n mono" id="pct-label">
+      {{ ((summary.occupied + summary.booked) / summary.total * 100)|round|int }}%
+    </span>
+  </div>
+  <div style="height:12px;background:#0e2235;border-radius:99px;overflow:hidden;display:flex">
+    <div id="bar-occ"
+         style="height:100%;width:{{ (summary.occupied/summary.total*100)|round|int }}%;
+                background:linear-gradient(90deg,#ff3c5c,#ff7096);border-radius:99px 0 0 99px;transition:width .8s"></div>
+    <div id="bar-res"
+         style="height:100%;width:{{ (summary.booked/summary.total*100)|round|int }}%;
+                background:linear-gradient(90deg,#ffd000,#ffe86a);transition:width .8s"></div>
+  </div>
+  <div style="display:flex;gap:18px;margin-top:8px;font-size:.78rem;color:var(--dim)">
+    <span style="color:var(--red)">■ Occupied</span>
+    <span style="color:var(--yellow)">■ Reserved</span>
+    <span>■ Free</span>
+  </div>
+</div>
+
+<div class="grid-2">
+  <!-- CNN PREDICTION -->
+  <div class="card">
+    <div class="card-title">🔮 CNN Prediction</div>
+    <div style="text-align:center;padding:10px 0">
+      <div class="mono" style="font-size:3rem;font-weight:800;color:var(--yellow)">
+        {{ pred.predicted_occupied }}
+      </div>
+      <div class="text-dim" style="font-size:.84rem;margin-top:6px">
+        Predicted occupied at {{ pred.hour }}:00
+      </div>
+      <div style="margin-top:12px;font-size:.84rem;color:var(--neon)">
+        {{ pred.predicted_available }} slots expected free
+      </div>
+    </div>
+    <div style="margin-top:14px">
+      <div style="display:flex;justify-content:space-between;font-size:.82rem;margin-bottom:5px">
+        <span class="text-dim">Model Confidence</span>
+        <span class="text-n mono">{{ pred.confidence }}%</span>
+      </div>
+      <div style="height:7px;background:#0e2235;border-radius:99px;overflow:hidden">
+        <div style="height:100%;width:{{ pred.confidence }}%;
+                    background:linear-gradient(90deg,#005f7a,var(--neon));
+                    border-radius:99px;transition:width .8s"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- QUICK ACTIONS -->
+  <div class="card">
+    <div class="card-title">⚡ Quick Actions</div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <a href="/admin/bookings" class="btn btn-p">📋 View All Bookings</a>
+      <a href="/admin/slots"    class="btn btn-p" style="background:linear-gradient(135deg,#3a0080,var(--purple));color:#fff">🗺️ CNN Slot Status</a>
+      <a href="/admin/export"   class="btn btn-g">📥 Export Excel</a>
+    </div>
+    <div class="mt-2" style="background:rgba(0,212,255,.05);border:1px solid rgba(0,212,255,.12);
+         border-radius:8px;padding:12px;font-size:.8rem;color:var(--dim)">
+      <b class="text-n">Today:</b> {{ today }}<br/>
+      <b class="text-n">Today's Bookings:</b> {{ today_bk|length }}
+    </div>
+  </div>
+</div>
+
+<!-- TODAY'S BOOKINGS -->
+<div class="card mt-3">
+  <div class="card-title">📅 Today's Bookings — {{ today }}</div>
+  {% if today_bk %}
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr><th>Booking ID</th><th>User</th><th>Vehicle</th><th>Slot</th>
+            <th>Time</th><th>Amount</th><th>Status</th><th>Action</th></tr>
+      </thead>
+      <tbody>
+        {% for b in today_bk %}
+        <tr>
+          <td class="mono text-y" style="font-size:.7rem">{{ b.booking_id }}</td>
+          <td>
+            <div class="fw-bold">{{ b.user_name }}</div>
+            <div class="text-dim" style="font-size:.78rem">{{ b.phone }}</div>
+          </td>
+          <td class="mono text-n" style="font-size:.8rem">{{ b.vehicle_number }}</td>
+          <td><b>{{ b.slot_id }}</b></td>
+          <td style="font-size:.82rem">{{ b.start_time }} – {{ b.end_time }}</td>
+          <td class="text-g mono">₹{{ b.amount }}</td>
+          <td><span class="badge b-{{ b.status }}">{{ b.status.upper() }}</span></td>
+          <td>
+            {% if b.status=='confirmed' %}
+            <form method="POST" action="/admin/cancel/{{ b.booking_id }}"
+                  onsubmit="return confirm('Cancel?')">
+              <button class="btn btn-r" type="submit"
+                      style="padding:4px 10px;font-size:.65rem">CANCEL</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div style="color:var(--dim);text-align:center;padding:30px 0">No bookings today.</div>
+  {% endif %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+async function liveRefresh(){
+  const d=await fetch('/api/status').then(r=>r.json());
+  document.getElementById('s-total').textContent=d.total;
+  document.getElementById('s-avail').textContent=d.available;
+  document.getElementById('s-occ').textContent=d.occupied;
+  document.getElementById('s-res').textContent=d.booked;
+  const total=d.total;
+  const oppct=(d.occupied/total*100).toFixed(1);
+  const respct=(d.booked/total*100).toFixed(1);
+  document.getElementById('bar-occ').style.width=oppct+'%';
+  document.getElementById('bar-res').style.width=respct+'%';
+  document.getElementById('pct-label').textContent=
+    Math.round(parseFloat(oppct)+parseFloat(respct))+'%';
+}
+setInterval(liveRefresh,5000);
+</script>
+{% endblock %}

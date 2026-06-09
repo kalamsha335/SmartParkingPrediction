@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+{% block title %}Slot Status{% endblock %}
+{% block content %}
+<!-- SUMMARY -->
+<div class="stat-grid" style="grid-template-columns:repeat(4,1fr)">
+  <div class="stat-card sc-b"><div class="stat-label">Total</div>
+    <div class="stat-num">{{ summary.total }}</div></div>
+  <div class="stat-card sc-g"><div class="stat-label">Available</div>
+    <div class="stat-num" id="s-avail">{{ summary.available }}</div></div>
+  <div class="stat-card sc-r"><div class="stat-label">Occupied</div>
+    <div class="stat-num" id="s-occ">{{ summary.occupied }}</div></div>
+  <div class="stat-card sc-y"><div class="stat-label">Booked</div>
+    <div class="stat-num" id="s-bk">{{ summary.booked }}</div></div>
+</div>
+
+<div class="grid-2">
+  <!-- SLOT MAP -->
+  <div class="card">
+    <div class="card-title"><span class="live-dot"></span> Live Slot Map</div>
+    <div style="display:flex;gap:14px;font-size:.76rem;margin-bottom:14px">
+      <span style="color:var(--green)">■ Available</span>
+      <span style="color:var(--red)">■ Occupied</span>
+      <span style="color:var(--yellow)">■ Booked</span>
+    </div>
+    {% for floor, slots in floors.items() %}
+    <div class="slot-floor">
+      <div class="floor-label">{{ floor }}</div>
+      <div class="slot-row">
+        {% for s in slots %}
+        <span class="slot-btn
+          {% if s.status=='available' %}sl-avail
+          {% elif s.status=='occupied' %}sl-occ
+          {% else %}sl-book{% endif %}"
+          id="sp-{{ s.slot_id }}" title="{{ s.status }}">{{ s.slot_id }}</span>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- CNN MODULE -->
+  <div class="card">
+    <div class="card-title">📷 CNN Detection Module</div>
+
+    <!-- Camera live feed -->
+    <div style="position:relative;background:#0e2235;border-radius:10px;overflow:hidden;
+                aspect-ratio:4/3;margin-bottom:14px">
+      <video id="cam" autoplay muted playsinline
+             style="width:100%;height:100%;object-fit:cover;display:none"></video>
+      <canvas id="canvas" style="display:none"></canvas>
+      <div id="cam-placeholder" style="display:flex;align-items:center;justify-content:center;
+           height:100%;flex-direction:column;gap:8px;color:var(--dim)">
+        <div style="font-size:2rem">📷</div>
+        <div style="font-size:.82rem">Camera feed not started</div>
+      </div>
+      <div id="cnn-overlay" style="position:absolute;top:8px;right:8px;
+           background:rgba(0,0,0,.7);border-radius:6px;padding:6px 10px;
+           font-size:.75rem;font-family:'Orbitron',monospace;display:none">
+        CNN ACTIVE
+      </div>
+    </div>
+
+    <!-- Controls -->
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-p" onclick="startCamera()" id="btn-start">▶ START CAMERA</button>
+      <button class="btn btn-r" onclick="stopCamera()"  id="btn-stop" disabled>⏹ STOP</button>
+      <button class="btn btn-g" onclick="analyzeFrame()" id="btn-detect" disabled>🔍 DETECT NOW</button>
+    </div>
+
+    <!-- Target slot -->
+    <div class="form-group mt-2">
+      <label>Slot ID to Analyse</label>
+      <input class="fc" type="text" id="target-slot" placeholder="e.g. G-01" style="text-transform:uppercase"/>
+    </div>
+
+    <!-- Result box -->
+    <div id="cnn-result" style="background:#060d14;border:1px solid var(--border);
+         border-radius:8px;padding:14px;min-height:60px;font-size:.86rem;
+         display:flex;align-items:center;justify-content:center;color:var(--dim)">
+      Run detection to see result
+    </div>
+  </div>
+</div>
+
+<!-- CNN LOG TABLE -->
+<div class="card mt-3">
+  <div class="card-title">🧾 CNN Detection Log</div>
+  {% if logs %}
+  <div class="tbl-wrap" style="max-height:280px">
+    <table>
+      <thead><tr><th>#</th><th>Slot</th><th>CNN Result</th><th>Confidence</th><th>Time</th></tr></thead>
+      <tbody>
+        {% for l in logs %}
+        <tr>
+          <td class="text-dim" style="font-size:.78rem">{{ l.id }}</td>
+          <td><b>{{ l.slot_id }}</b></td>
+          <td><span class="badge {% if l.prediction=='occupied' %}b-occupied{% else %}b-available{% endif %}">
+            {{ l.prediction.upper() }}</span></td>
+          <td class="text-n mono">{{ "%.1f"|format(l.confidence*100) }}%</td>
+          <td class="text-dim" style="font-size:.78rem">{{ l.logged_at }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div style="color:var(--dim);text-align:center;padding:24px">
+    No CNN detections yet. Start camera and run detection.
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let stream = null;
+
+async function startCamera(){
+  try{
+    stream = await navigator.mediaDevices.getUserMedia({video:true});
+    document.getElementById('cam').srcObject=stream;
+    document.getElementById('cam').style.display='block';
+    document.getElementById('cam-placeholder').style.display='none';
+    document.getElementById('cnn-overlay').style.display='block';
+    document.getElementById('btn-start').disabled=true;
+    document.getElementById('btn-stop').disabled=false;
+    document.getElementById('btn-detect').disabled=false;
+  }catch(e){
+    toast('Camera access denied: '+e.message,true);
+  }
+}
+
+function stopCamera(){
+  if(stream) stream.getTracks().forEach(t=>t.stop());
+  stream=null;
+  document.getElementById('cam').style.display='none';
+  document.getElementById('cam-placeholder').style.display='flex';
+  document.getElementById('cnn-overlay').style.display='none';
+  document.getElementById('btn-start').disabled=false;
+  document.getElementById('btn-stop').disabled=true;
+  document.getElementById('btn-detect').disabled=true;
+}
+
+async function analyzeFrame(){
+  const video  = document.getElementById('cam');
+  const canvas = document.getElementById('canvas');
+  const slotId = document.getElementById('target-slot').value.trim().toUpperCase() || '?';
+  canvas.width=video.videoWidth; canvas.height=video.videoHeight;
+  canvas.getContext('2d').drawImage(video,0,0);
+  const b64 = canvas.toDataURL('image/jpeg',0.8);
+
+  const res = document.getElementById('cnn-result');
+  res.textContent='🔍 Analysing...'; res.style.color='var(--neon)';
+
+  try{
+    const data = await fetch('/api/cnn-detect',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({slot_id:slotId, image:b64})
+    }).then(r=>r.json());
+
+    const color = data.occupied ? 'var(--red)' : 'var(--green)';
+    const icon  = data.occupied ? '🔴' : '🟢';
+    res.innerHTML = `
+      <div style="text-align:center;width:100%">
+        <div style="font-size:1.8rem">${icon}</div>
+        <div style="color:${color};font-family:'Orbitron',monospace;font-weight:700;font-size:1.1rem;margin:4px 0">
+          ${data.status.toUpperCase()}
+        </div>
+        <div style="font-size:.82rem;color:var(--dim)">
+          Slot: <b>${data.slot_id}</b> | Confidence: <span style="color:var(--neon)">${data.confidence}%</span>
+        </div>
+      </div>`;
+    res.style.color='#fff';
+
+    // Update map pill
+    const pill = document.getElementById('sp-'+data.slot_id);
+    if(pill){
+      pill.className='slot-btn '+(data.occupied?'sl-occ':'sl-avail');
+    }
+    refreshStats();
+    toast(`${icon} ${data.slot_id}: ${data.status} (${data.confidence}%)`);
+  }catch(e){ res.textContent='Error: '+e.message; res.style.color='var(--red)'; }
+}
+
+// Auto-refresh slot map and stats
+async function refreshStats(){
+  const d=await fetch('/api/status').then(r=>r.json());
+  document.getElementById('s-avail').textContent=d.available;
+  document.getElementById('s-occ').textContent=d.occupied;
+  document.getElementById('s-bk').textContent=d.booked;
+  const slots=await fetch('/api/slots').then(r=>r.json());
+  slots.forEach(s=>{
+    const el=document.getElementById('sp-'+s.slot_id);
+    if(el) el.className='slot-btn '+(s.status==='available'?'sl-avail':s.status==='occupied'?'sl-occ':'sl-book');
+  });
+}
+setInterval(refreshStats,5000);
+</script>
+{% endblock %}

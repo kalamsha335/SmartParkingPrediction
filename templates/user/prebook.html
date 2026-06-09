@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block title %}Pre-Book Slot{% endblock %}
+{% block content %}
+<div class="grid-2">
+
+  <!-- BOOKING FORM -->
+  <div class="card">
+    <div class="card-title">📌 Pre-Book Parking Slot</div>
+    <form method="POST" id="book-form">
+
+      <div class="form-group">
+        <label>Vehicle Number</label>
+        <input class="fc" type="text" name="vehicle_number" id="veh"
+               placeholder="TN 65 XX 0000" style="text-transform:uppercase" required/>
+      </div>
+      <div class="form-group">
+        <label>Parking Date</label>
+        <input class="fc" type="date" name="parking_date" id="pdate" min="{{ today }}" value="{{ today }}" required/>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Start Time</label>
+          <input class="fc" type="time" name="start_time" id="stime" required oninput="calcCost()"/>
+        </div>
+        <div class="form-group">
+          <label>End Time</label>
+          <input class="fc" type="time" name="end_time" id="etime" required oninput="calcCost()"/>
+        </div>
+      </div>
+
+      <div class="cost-preview">
+        Estimated Cost: <span class="text-g mono fw-bold" id="cost-display">₹ 0.00</span>
+        <span class="text-dim" style="font-size:.8rem"> (₹30/hr)</span>
+      </div>
+
+      <input type="hidden" name="slot_id" id="selected-slot"/>
+      <div class="form-group">
+        <label>Selected Slot</label>
+        <div id="sel-display" style="background:#060d14;border:1px solid var(--border);
+             border-radius:8px;padding:11px 13px;color:var(--dim);font-size:.88rem">
+          Click a slot on the map →
+        </div>
+      </div>
+
+      <button class="btn btn-p btn-full" type="submit" id="book-btn" disabled>
+        CONFIRM BOOKING
+      </button>
+    </form>
+  </div>
+
+  <!-- SLOT MAP -->
+  <div class="card">
+    <div class="card-title">🗺️ Parking Map — Select a Slot</div>
+
+    <div style="display:flex;gap:14px;font-size:.78rem;margin-bottom:14px">
+      <span style="color:var(--green)">■ Available</span>
+      <span style="color:var(--red)">■ Occupied</span>
+      <span style="color:var(--yellow)">■ Booked</span>
+      <span style="color:var(--neon)">■ Selected</span>
+    </div>
+
+    {% for floor, slots in floors.items() %}
+    <div class="slot-floor">
+      <div class="floor-label">{{ floor }}</div>
+      <div class="slot-row">
+        {% for s in slots %}
+        {% if s.status == 'available' %}
+        <button type="button" class="slot-btn sl-avail"
+                id="slot-{{ s.slot_id }}"
+                onclick="selectSlot('{{ s.slot_id }}')">{{ s.slot_id }}</button>
+        {% elif s.status == 'occupied' %}
+        <button type="button" class="slot-btn sl-occ" disabled>{{ s.slot_id }}</button>
+        {% else %}
+        <button type="button" class="slot-btn sl-book" disabled title="Booked">{{ s.slot_id }}</button>
+        {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+
+    <div id="map-refresh" style="font-size:.75rem;color:var(--dim);margin-top:10px">
+      <span class="live-dot"></span> Auto-refreshes every 5s
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let selectedSlot = '';
+
+function selectSlot(sid) {
+  // Deselect old
+  if(selectedSlot) {
+    const old = document.getElementById('slot-'+selectedSlot);
+    if(old) { old.className='slot-btn sl-avail'; }
+  }
+  selectedSlot = sid;
+  document.getElementById('selected-slot').value = sid;
+  document.getElementById('sel-display').textContent = '✅ Slot ' + sid + ' selected';
+  document.getElementById('sel-display').style.color = 'var(--green)';
+  const el = document.getElementById('slot-'+sid);
+  if(el) el.className = 'slot-btn sl-sel';
+  checkCanBook();
+}
+
+function calcCost() {
+  const s=document.getElementById('stime').value;
+  const e=document.getElementById('etime').value;
+  if(s&&e){
+    const d=(new Date('1970-01-01T'+e)-new Date('1970-01-01T'+s))/3600000;
+    document.getElementById('cost-display').textContent = d>0?'₹'+(d*30).toFixed(2):'₹ 0.00';
+  }
+  checkCanBook();
+}
+
+function checkCanBook(){
+  const ok = selectedSlot &&
+             document.getElementById('pdate').value &&
+             document.getElementById('stime').value &&
+             document.getElementById('etime').value &&
+             document.getElementById('veh').value;
+  document.getElementById('book-btn').disabled = !ok;
+}
+
+document.getElementById('veh').addEventListener('input', e=>{
+  e.target.value = e.target.value.toUpperCase(); checkCanBook();
+});
+document.getElementById('pdate').addEventListener('change', checkCanBook);
+
+// Auto-refresh map every 5s
+async function refreshMap(){
+  const data = await fetch('/api/slots').then(r=>r.json());
+  data.forEach(s=>{
+    const el = document.getElementById('slot-'+s.slot_id);
+    if(!el) return;
+    if(s.slot_id === selectedSlot) return; // keep selected highlight
+    if(s.status==='available') el.className='slot-btn sl-avail';
+    else { el.className='slot-btn '+(s.status==='occupied'?'sl-occ':'sl-book'); el.disabled=true; }
+  });
+}
+setInterval(refreshMap, 5000);
+</script>
+{% endblock %}
